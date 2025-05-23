@@ -18,6 +18,10 @@ directories:
 publish:
   - provider: github
 
+extraResources:
+  - from: public
+    to: resources
+
 win:
   target:
     - nsis

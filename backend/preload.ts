@@ -35,6 +35,8 @@ export const api = {
   sendSync: (channel: string, args: any): any => {
     return ipcRenderer.sendSync(channel, args);
   },
+
+  onLowStockWarning: (callback:Function) => ipcRenderer.on('low-stock-warning', (_, data) => callback(data))
 };
 
 contextBridge.exposeInMainWorld("api", api);

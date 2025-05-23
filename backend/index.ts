@@ -1,33 +1,57 @@
 import { ipcMain } from "electron";
 import { app, BrowserWindow } from "electron/main";
 import { join } from "node:path";
-import { Model } from "sequelize";
-import { sequelize, User } from "./database";
+import {
+  cashInvoiceListHandler,
+  insertCashInvoiceHandler,
+  removeCashInvoiceHandler,
+  updateCashInvoiceHandler,
+} from "./controllers/cashinvoice.controller";
+import {
+  companyCheckHandler,
+  companyListHandler,
+  insertCompanyHandler,
+  removeCompanyHandler,
+  updateCompanyHandler,
+} from "./controllers/company.controller";
+import {
+  customerListHandler,
+  insertCustomerHandler,
+  removeCustomerHandler,
+  updateCustomerHandler,
+} from "./controllers/customer.controller";
+import {
+  insernteryTransectionListHandler,
+  insertInventeryTransectionHandler,
+  removeStockHandler,
+} from "./controllers/inventerytransection.controller";
+import {
+  generatePDFInvoiceHandler,
+  insertInvoiceHandler,
+  invoiceAnalytics,
+  invoiceListHandler,
+  invoiceSuccessUpdateHandler,
+  removeInvoiceHandler,
+  updateInvoiceHandler,
+  draftInvoiceListHandler,
+} from "./controllers/invoice.controller";
+import {
+  insertProductHandler,
+  productCheckHandler,
+  productListHandler,
+  removeProductHandler,
+  updateProductHandler,
+} from "./controllers/product.controller";
+import { loginController } from "./controllers/user.controller";
+import { sequelize } from "./database";
+import "./models/index";
+import { User } from "./models/user.model";
 import { isDev } from "./utils/env";
 import { initLogs } from "./utils/initLogs";
 import { prepareNext } from "./utils/prepareNext";
-
-/**
- * Creates the main application window.
- *
- * The window is created with the following options:
- *
- * - `width`: 900
- * - `height`: 700
- * - `webPreferences`:
- *   - `nodeIntegration`: false
- *   - `contextIsolation`: true
- *   - `preload`: the path to the preload script
- *
- * If the application is running in development mode, the window is loaded with
- * the URL "http://localhost:4444/", and the devtools are opened. The window is
- * also maximized.
- *
- * If the application is running in production mode, the window is loaded with
- * the path to the main application HTML file, and the menu is set to null.
- */
+let win: BrowserWindow;
 function createWindow(): void {
-  const win = new BrowserWindow({
+  win = new BrowserWindow({
     width: 900,
     height: 700,
     webPreferences: {
@@ -47,32 +71,24 @@ function createWindow(): void {
   }
 }
 
-/**
- * When the application is ready, this function is called.
- *
- * It creates a BrowserWindow instance and loads the main application.
- * It also sets up the logging and database connections.
- *
- * @returns {Promise<void>} A Promise that resolves when all the setup is done.
- */
 app.whenReady().then(async () => {
   await prepareNext("./frontend", 4444);
 
   await initLogs();
 
-  await sequelize
-    .sync({
-      logging: true,
-      alter: true,
-
-      // this is used for development.
-      // If you want to reset the database, set this to true and run the script again.
-      // Otherwise, set it to false.
-      force: false,
-    })
-    .then(() => {
-      console.log("Database synced");
+  await sequelize.sync({
+    logging: false,
+    alter: true,
+    force: false,
+  });
+  const userCount = await User.count();
+  if (!userCount)
+    await User.create({
+      name: "Default User",
+      email: "admin@gmail.com",
+      password: "jo230i349",
     });
+  console.log("Database synced");
 
   createWindow();
 
@@ -81,24 +97,41 @@ app.whenReady().then(async () => {
   });
 });
 
-/* ++++++++++ events ++++++++++ */
 app.on("window-all-closed", () => {
   if (process.platform !== "darwin") app.quit();
 });
 
-/* ++++++++++ code ++++++++++ */
-ipcMain.on("addUser", async (event, data: any) => {
-  await User.create(data)
-    .then((data: Model) => {
-      event.returnValue = {
-        error: false,
-        data: data.dataValues,
-      };
-    })
-    .catch((error) => {
-      event.returnValue = {
-        error: true,
-        data: error,
-      };
-    });
-});
+ipcMain.on("insert-company", insertCompanyHandler);
+ipcMain.on("company-list", companyListHandler);
+ipcMain.on("update-company", updateCompanyHandler);
+ipcMain.on("insert-product", insertProductHandler);
+ipcMain.on("update-product", updateProductHandler);
+ipcMain.on("product-list", productListHandler);
+ipcMain.on("insert-invoice", (event, data) =>
+  insertInvoiceHandler(event, data, win)
+);
+ipcMain.on("insert-customer", insertCustomerHandler);
+ipcMain.on("customer-list", customerListHandler);
+ipcMain.on("generate-pdf", generatePDFInvoiceHandler);
+ipcMain.on("insert-cash-invoice", insertCashInvoiceHandler);
+ipcMain.on("cash-invoice-list", cashInvoiceListHandler);
+ipcMain.on("stock-list", insernteryTransectionListHandler);
+ipcMain.on("insert-stock", insertInventeryTransectionHandler);
+ipcMain.on("invoice-list", invoiceListHandler);
+ipcMain.on("invoice-analytics", invoiceAnalytics);
+ipcMain.on("update-customer", updateCustomerHandler);
+ipcMain.on("remove-customer", removeCustomerHandler);
+ipcMain.on("remove-company", removeCompanyHandler);
+ipcMain.on("remove-product", removeProductHandler);
+ipcMain.on("product-check", productCheckHandler);
+ipcMain.on("company-check", companyCheckHandler);
+ipcMain.on("user-login", loginController);
+ipcMain.on("remove-invoice", removeInvoiceHandler);
+ipcMain.on("remove-cash-invoice", removeCashInvoiceHandler);
+ipcMain.on("remove-stock", removeStockHandler);
+ipcMain.on("update-cash-invoice", updateCashInvoiceHandler);
+ipcMain.on("update-invoice", updateInvoiceHandler);
+ipcMain.on("draft-invoice-list", draftInvoiceListHandler);
+ipcMain.on("invoice-success", (event, data) =>
+  invoiceSuccessUpdateHandler(event, data, win)
+);

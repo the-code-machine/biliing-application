@@ -1,7 +1,11 @@
 import { api } from "../../backend/preload";
 
 declare global {
-  interface Global {
-    api: typeof api;
+  namespace NodeJS {
+    interface Global {
+      api: typeof api;
+    }
   }
 }
+
+global.api = api;
