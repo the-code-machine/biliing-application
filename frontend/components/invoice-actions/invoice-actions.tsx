@@ -14,12 +14,27 @@ import { Invoice } from "@/lib/types";
 import { queryClient } from "@/providers/query.provider";
 import InvoiceChallanContentGenerator from "@/utils/invoice-challan-content-generator";
 import InvoiceEstimationContentGenerator from "@/utils/invoice-estimation-content-generator";
-import Sanscript from "@indic-transliteration/sanscript";
 import { useMutation } from "@tanstack/react-query";
 import { Check, MoreVertical, Pencil } from "lucide-react";
 import toast from "react-hot-toast";
 import useSWRMutation from "swr/mutation";
 import UpdateInvoiceForm from "../update-invoice-form/update-invoice-form";
+
+export async function translate(text: string): Promise<string> {
+  try {
+    const response = global.api.sendSync("translate-text", text);
+
+    if (response?.statusCode === 200) {
+      return response.data; // Translated text
+    } else {
+      console.warn("Translation error:", response?.message);
+      return text; // fallback to original text
+    }
+  } catch (err) {
+    console.error("IPC translation failed:", err);
+    return text; // fallback
+  }
+}
 
 interface ActionDropdownProps {
   invoice: Invoice;
@@ -38,19 +53,19 @@ export default function InvoiceAction({
   const printChallanBillMutation = useSWRMutation(
     "/generate-invoice",
     async () => {
+      const translatedName = await translate(invoice.customer.name);
+      const translatedAddress = await translate(invoice.customer.address);
+      const translatedRemark = await translate(invoice.remark || "");
+
       const content = InvoiceChallanContentGenerator({
         customer: {
           ...invoice.customer,
+          name: translatedName,
+          address: translatedAddress,
           status: true,
           mobileNumber: invoice.customer.mobileNumber,
-          name: Sanscript.t(invoice.customer.name, "itrans", "devanagari"),
-          address: Sanscript.t(
-            invoice.customer.address,
-            "itrans",
-            "devanagari"
-          ),
         },
-        remark: Sanscript.t(invoice.remark || "", "itrans", "devanagari"),
+        remark: translatedRemark,
         products: invoice.invoiceProducts.map((product) => ({
           measurement: product.measurement,
           name: product.name,
@@ -62,28 +77,31 @@ export default function InvoiceAction({
         invoiceDate: new Date(invoice.date),
         total: total,
       });
+
       generatePDFInoviceHandler(content);
     }
   );
+
   const printEstimateBillMutation = useSWRMutation(
     "/generate-invoice",
     async () => {
+      // Resolve translations first
+      const translatedName = await translate(invoice.customer.name);
+      const translatedAddress = await translate(invoice.customer.address);
+      const translatedRemark = await translate(invoice.remark || "");
+
       const content = InvoiceEstimationContentGenerator({
         customer: {
           ...invoice.customer,
           status: true,
           mobileNumber: invoice.customer.mobileNumber,
-          name: Sanscript.t(invoice.customer.name, "itrans", "devanagari"),
-          address: Sanscript.t(
-            invoice.customer.address,
-            "itrans",
-            "devanagari"
-          ),
+          name: translatedName,
+          address: translatedAddress,
         },
-        remark: Sanscript.t(invoice.remark || "", "itrans", "devanagari"),
+        remark: translatedRemark,
         products: invoice.invoiceProducts.map((product) => ({
           measurement: product.measurement,
-          name: product.name,
+          name: product.name, // optional: translate(product.name) if needed
           qty: product.InvoiceProduct.quantity,
           rate: product.InvoiceProduct.price,
           units: product.InvoiceProduct.units,
@@ -94,9 +112,11 @@ export default function InvoiceAction({
         fright: invoice.freight,
         hamamli: invoice.hammali,
       });
+
       generatePDFInoviceHandler(content);
     }
   );
+
   const updateSucessMutation = useMutation({
     mutationFn: updateInvoiceStatusMutation,
     onSuccess: () => {

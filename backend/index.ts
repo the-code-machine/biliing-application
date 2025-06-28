@@ -1,6 +1,7 @@
 import { ipcMain } from "electron";
 import { app, BrowserWindow } from "electron/main";
 import { join } from "node:path";
+
 import {
   cashInvoiceListHandler,
   insertCashInvoiceHandler,
@@ -49,6 +50,7 @@ import { User } from "./models/user.model";
 import { isDev } from "./utils/env";
 import { initLogs } from "./utils/initLogs";
 import { prepareNext } from "./utils/prepareNext";
+import { translateController } from "./controllers/translator.controller";
 let win: BrowserWindow;
 function createWindow(): void {
   win = new BrowserWindow({
@@ -135,3 +137,4 @@ ipcMain.on("draft-invoice-list", draftInvoiceListHandler);
 ipcMain.on("invoice-success", (event, data) =>
   invoiceSuccessUpdateHandler(event, data, win)
 );
+ipcMain.on("translate-text", translateController);
