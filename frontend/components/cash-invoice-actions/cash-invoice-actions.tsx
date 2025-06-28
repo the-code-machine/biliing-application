@@ -15,14 +15,44 @@ interface ActionDropdownProps {
 }
 
 export default function CashInvoiceAction({ cashInvoice }: ActionDropdownProps) {
-    const printCashBillMutation = useSWRMutation("/generate-invoice", async () => {
-        const content = CashInvoiceContentGenerator({
-            customer: { ...cashInvoice.customer, status: true, name: Sanscript.t(cashInvoice.customer.name, 'itrans', 'devanagari'), address: Sanscript.t(cashInvoice.customer.address, 'itrans', 'devanagari') },
-            amount: cashInvoice.amount,
-            invoiceDate: new Date(cashInvoice.date)
-        })
-        generatePDFInoviceHandler(content)
+     async function translate(text: string): Promise<string> {
+  try {
+    const response = global.api.sendSync("translate-text", text);
+
+    if (response?.statusCode === 200) {
+      return response.data; // Translated text
+    } else {
+      console.warn("Translation error:", response?.message);
+      return text; // fallback to original text
+    }
+  } catch (err) {
+    console.error("IPC translation failed:", err);
+    return text; // fallback
+  }
+}
+const printCashBillMutation = useSWRMutation(
+  "/generate-invoice",
+  async () => {
+    const [translatedName, translatedAddress] = await Promise.all([
+      translate(cashInvoice.customer.name),
+      translate(cashInvoice.customer.address),
+    ]);
+
+    const content = CashInvoiceContentGenerator({
+      customer: {
+        ...cashInvoice.customer,
+        status: true,
+        name: translatedName,
+        address: translatedAddress,
+      },
+      amount: cashInvoice.amount,
+      invoiceDate: new Date(cashInvoice.date),
     });
+
+    generatePDFInoviceHandler(content);
+  }
+);
+
     const removeCashBillMutation = useSWRMutation("/cash-invoice/list", async () => {
         return removeCashInvoiceMutationHandler({
             id: cashInvoice.id

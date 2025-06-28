@@ -86,7 +86,7 @@ export const generatePDFInvoiceHandler = asynchandler({
       generatePDFInvoiceControllerValidator.safeParse(data);
     if (!dataValidation.success)
       return (event.returnValue = new ApiError(400, "Invalid Data"));
-    const printWindow = new BrowserWindow({ show: false });
+    const printWindow = new BrowserWindow({ show: true});
     printWindow.loadURL(
       `data:text/html;charset=utf-8,${encodeURIComponent(
         dataValidation.data.content
@@ -97,13 +97,14 @@ export const generatePDFInvoiceHandler = asynchandler({
     printWindow.webContents.on("did-finish-load", () => {
       printWindow.webContents.print(
         {
+          silent: false,
           pageSize: "A6",
           printBackground: true,
           landscape: false,
         },
         (success, errorType) => {
           if (!success) console.log(`Print failed: ${errorType}`);
-          printWindow.close();
+         
         }
       );
     });

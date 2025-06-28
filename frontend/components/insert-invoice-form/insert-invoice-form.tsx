@@ -126,109 +126,118 @@ export default function InsertInvoiceForm({
       },
     }
   );
+ async function translate(text: string): Promise<string> {
+  try {
+    const response = global.api.sendSync("translate-text", text);
 
-  const printChallanBillMutation = useSWRMutation(
-    "/generate-invoice",
-    async () => {
-      const total = invoiceForm
-        .getValues("products")
-        ?.reduce((total: number, product) => {
-          const productAmount = product.qty * product.rate;
-          return total + productAmount;
-        }, 0);
-      const content = InvoiceChallanContentGenerator({
-        customer: {
-          ...invoiceForm.getValues("customerId"),
-          status: true,
-          mobileNumber: invoiceForm.getValues("customerId.phoneNumber"),
-          name: Sanscript.t(
-            invoiceForm.getValues("customerId.name"),
-            "itrans",
-            "devanagari"
-          ),
-          address: Sanscript.t(
-            invoiceForm.getValues("customerId.address"),
-            "itrans",
-            "devanagari"
-          ),
-        },
-        remark: Sanscript.t(
-          invoiceForm.getValues("remark") || "",
-          "itrans",
-          "devanagari"
-        ),
-        products: invoiceForm.getValues("products").map((product) => ({
-          measurement: product.measurement,
-          name: product.name,
-          qty: product.qty,
-          rate: product.rate,
-          units: product.units,
-        })),
-        cash: invoiceForm.getValues("caseAmount"),
-        invoiceDate: new Date(invoiceForm.getValues("date")),
-        total: total,
-      });
-      generatePDFInoviceHandler(content);
-    },
-    {
-      onSuccess: () => {
-        invoiceForm.reset();
-        setSucessStatus(false);
-      },
+    if (response?.statusCode === 200) {
+      return response.data; // Translated text
+    } else {
+      console.warn("Translation error:", response?.message);
+      return text; // fallback to original text
     }
-  );
-  const printEstimateBillMutation = useSWRMutation(
-    "/generate-invoice",
-    async () => {
-      const total = invoiceForm
-        .getValues("products")
-        ?.reduce((total: number, product) => {
-          const productAmount = product.qty * product.rate;
-          return total + productAmount;
-        }, 0);
-      const content = InvoiceEstimationContentGenerator({
-        customer: {
-          ...invoiceForm.getValues("customerId"),
-          status: true,
-          mobileNumber: invoiceForm.getValues("customerId.phoneNumber"),
-          name: Sanscript.t(
-            invoiceForm.getValues("customerId.name"),
-            "itrans",
-            "devanagari"
-          ),
-          address: Sanscript.t(
-            invoiceForm.getValues("customerId.address"),
-            "itrans",
-            "devanagari"
-          ),
-        },
-        remark: Sanscript.t(
-          invoiceForm.getValues("remark") || "",
-          "itrans",
-          "devanagari"
-        ),
-        products: invoiceForm.getValues("products").map((product) => ({
-          measurement: product.measurement,
-          name: product.name,
-          qty: product.qty,
-          rate: product.rate,
-          units: product.units,
-        })),
-        cash: invoiceForm.getValues("caseAmount"),
-        invoiceDate: new Date(invoiceForm.getValues("date")),
-        total: total,
-        fright: invoiceForm.getValues("freight"),
-        hamamli: invoiceForm.getValues("hammali"),
-      });
-      generatePDFInoviceHandler(content);
-    },
-    {
-      onSuccess: () => {
-        setSucessStatus(false);
-        invoiceForm.reset();
+  } catch (err) {
+    console.error("IPC translation failed:", err);
+    return text; // fallback
+  }
+}
+
+const printChallanBillMutation = useSWRMutation(
+  "/generate-invoice",
+  async () => {
+    const total = invoiceForm.getValues("products")?.reduce((total: number, product) => {
+      const productAmount = product.qty * product.rate;
+      return total + productAmount;
+    }, 0);
+
+    // Translate fields
+    const [translatedName, translatedAddress, translatedRemark] = await Promise.all([
+      translate(invoiceForm.getValues("customerId.name")),
+      translate(invoiceForm.getValues("customerId.address")),
+      translate(invoiceForm.getValues("remark") || ""),
+    ]);
+
+    const content = InvoiceChallanContentGenerator({
+      customer: {
+        ...invoiceForm.getValues("customerId"),
+        status: true,
+        mobileNumber: invoiceForm.getValues("customerId.phoneNumber"),
+        name: translatedName,
+        address: translatedAddress,
       },
-    }
-  );
+      remark: translatedRemark,
+      products: invoiceForm.getValues("products").map((product) => ({
+        measurement: product.measurement,
+        name: product.name,
+        qty: product.qty,
+        rate: product.rate,
+        units: product.units,
+      })),
+      cash: invoiceForm.getValues("caseAmount"),
+      invoiceDate: new Date(invoiceForm.getValues("date")),
+      total: total,
+    });
+
+    generatePDFInoviceHandler(content);
+  },
+  {
+    onSuccess: () => {
+      invoiceForm.reset();
+      setSucessStatus(false);
+    },
+  }
+);
+
+const printEstimateBillMutation = useSWRMutation(
+  "/generate-invoice",
+  async () => {
+    const total = invoiceForm.getValues("products")?.reduce((total: number, product) => {
+      const productAmount = product.qty * product.rate;
+      return total + productAmount;
+    }, 0);
+
+    // Translate fields
+    const [translatedName, translatedAddress, translatedRemark] = await Promise.all([
+      translate(invoiceForm.getValues("customerId.name")),
+      translate(invoiceForm.getValues("customerId.address")),
+      translate(invoiceForm.getValues("remark") || ""),
+    ]);
+
+    const content = InvoiceEstimationContentGenerator({
+      customer: {
+        ...invoiceForm.getValues("customerId"),
+        status: true,
+        mobileNumber: invoiceForm.getValues("customerId.phoneNumber"),
+        name: translatedName,
+        address: translatedAddress,
+      },
+      remark: translatedRemark,
+      products: invoiceForm.getValues("products").map((product) => ({
+        measurement: product.measurement,
+        name: product.name,
+        qty: product.qty,
+        rate: product.rate,
+        units: product.units,
+      })),
+      cash: invoiceForm.getValues("caseAmount"),
+      invoiceDate: new Date(invoiceForm.getValues("date")),
+      total: total,
+      fright: invoiceForm.getValues("freight"),
+      hamamli: invoiceForm.getValues("hammali"),
+    });
+
+    generatePDFInoviceHandler(content);
+  },
+  {
+    onSuccess: () => {
+      setSucessStatus(false);
+      invoiceForm.reset();
+    },
+  }
+);
+
+
+
   const formData = invoiceForm.watch();
   const statusValue = invoiceForm.watch("status");
 

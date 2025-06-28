@@ -42,20 +42,50 @@ export default function CashInvoiceInsertForm({
             setIsSucess(true);
         }
     })
+ async function translate(text: string): Promise<string> {
+  try {
+    const response = global.api.sendSync("translate-text", text);
 
-    const printCashBillMutation = useSWRMutation("/generate-invoice", async () => {
-        const content = CashInvoiceContentGenerator({
-            customer: { ...cashInvoiceFrom.getValues("customerId"), status: true,name: Sanscript.t(cashInvoiceFrom.getValues("customerId.name"), 'itrans', 'devanagari'), address: Sanscript.t(cashInvoiceFrom.getValues("customerId.address"), 'itrans', 'devanagari') },
-            amount: cashInvoiceFrom.getValues("cashAmount"),
-            invoiceDate: cashInvoiceFrom.getValues("dateFrom"),
-        })
-        generatePDFInoviceHandler(content)
-    },{
-        onSuccess:()=>{
-            setIsSucess(false);
-            cashInvoiceFrom.reset();
-        }
-    })
+    if (response?.statusCode === 200) {
+      return response.data; // Translated text
+    } else {
+      console.warn("Translation error:", response?.message);
+      return text; // fallback to original text
+    }
+  } catch (err) {
+    console.error("IPC translation failed:", err);
+    return text; // fallback
+  }
+}
+    const printCashBillMutation = useSWRMutation(
+  "/generate-invoice",
+  async () => {
+    const [translatedName, translatedAddress] = await Promise.all([
+      translate(cashInvoiceFrom.getValues("customerId.name")),
+      translate(cashInvoiceFrom.getValues("customerId.address")),
+    ]);
+
+    const content = CashInvoiceContentGenerator({
+      customer: {
+        ...cashInvoiceFrom.getValues("customerId"),
+        status: true,
+        name: translatedName,
+        address: translatedAddress,
+      },
+      amount: cashInvoiceFrom.getValues("cashAmount"),
+      invoiceDate: cashInvoiceFrom.getValues("dateFrom"),
+    });
+
+    generatePDFInoviceHandler(content);
+  },
+  {
+    onSuccess: () => {
+      setIsSucess(false);
+      cashInvoiceFrom.reset();
+    },
+  }
+);
+
 
     if (isSucess)
         return (

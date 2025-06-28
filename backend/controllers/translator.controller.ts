@@ -10,13 +10,14 @@ export const translateController = asynchandler({
       const response = await axios.post(
         "https://deep-translator-api.azurewebsites.net/google/",
         {
-          source: "auto",
+          source: "en",
           text: text,
           target: "hi",
         }
       );
 
       if (response.data.translation) {
+        console.log("Online translation successful:", response.data.translation);
         return (event.returnValue = new ApiResponse(
           200,
           response.data.translation,
@@ -24,7 +25,7 @@ export const translateController = asynchandler({
         ));
       }
     } catch (error) {
-      console.warn("Online translation failed, using offline fallback.");
+      console.error("Online translation failed, using offline fallback.",error);
     }
 
     // 3. Fallback to Sanscript
